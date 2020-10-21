@@ -9,7 +9,7 @@ CONST_SQRT_2 = math.sqrt(2)
 CONST_INV_SQRT_2PI = 1 / math.sqrt(2 * math.pi)
 CONST_INV_SQRT_2 = 1 / math.sqrt(2)
 CONST_LOG_INV_SQRT_2PI = math.log(CONST_INV_SQRT_2PI)
-CONST_LOG_SQRT_2PI_E = math.log(math.sqrt(2 * math.pi * math.e))
+CONST_LOG_SQRT_2PI_E = 0.5 * math.log(2 * math.pi * math.e)
 
 
 class TruncatedStandardNormal(Distribution):
@@ -122,21 +122,10 @@ class TruncatedNormal(TruncatedStandardNormal):
         a_standard = (a - self.loc) / self.scale
         b_standard = (b - self.loc) / self.scale
         super(TruncatedNormal, self).__init__(a_standard, b_standard, eps=eps, validate_args=validate_args)
-        self._log_scale = torch.tensor(scale).log()
+        self._log_scale = self.scale.log()
         self._mean = self._mean * self.scale + self.loc
         self._variance = self._variance * self.scale ** 2
-
-    @property
-    def mean(self):
-        return self._mean
-
-    @property
-    def variance(self):
-        return self._variance
-
-    @property
-    def entropy(self):
-        return super(TruncatedNormal, self)._entropy + self._log_scale
+        self._entropy += self._log_scale
 
     def _to_std_rv(self, value):
         if self._validate_args:
@@ -159,18 +148,19 @@ class TruncatedNormal(TruncatedStandardNormal):
     def log_prob(self, value):
         if self._validate_args:
             self._validate_sample(value)
-        return super(TruncatedNormal, self).log_prob(self._to_std_rv(value))
+        return super(TruncatedNormal, self).log_prob(self._to_std_rv(value)) - self._log_scale
 
 
 if __name__ == '__main__':
     from scipy.stats import truncnorm
     loc, scale, a, b = 1., 2., 1., 2.
-    sp_a, sp_b = (a - loc) / scale, (b - loc) / scale
-    mean_sp, var_sp = truncnorm.stats(sp_a, sp_b, moments='mv')
     tn_pt = TruncatedNormal(loc, scale, a, b)
     mean_pt, var_pt = tn_pt.mean.item(), tn_pt.variance.item()
-    print(mean_sp * scale + loc, mean_pt)
-    print(var_sp * scale ** 2, var_pt)
-    print(tn_pt.icdf(0.333).item(), truncnorm.ppf(0.333, sp_a, sp_b) * scale + loc)
-    print(tn_pt.log_prob(1.5).item(), truncnorm.logpdf((1.5 - loc) / scale, sp_a, sp_b))
-    print(tn_pt.entropy, truncnorm.entropy(loc, scale))
+    alpha, beta = (a - loc) / scale, (b - loc) / scale
+    mean_sp, var_sp = truncnorm.stats(alpha, beta, loc=loc, scale=scale, moments='mv')
+    print('mean', mean_pt, mean_sp)
+    print('var', var_pt, var_sp)
+    print('cdf', tn_pt.cdf(1.4).item(), truncnorm.cdf(1.4, alpha, beta, loc=loc, scale=scale))
+    print('icdf', tn_pt.icdf(0.333).item(), truncnorm.ppf(0.333, alpha, beta, loc=loc, scale=scale))
+    print('logpdf', tn_pt.log_prob(1.5).item(), truncnorm.logpdf(1.5, alpha, beta, loc=loc, scale=scale))
+    print('entropy', tn_pt.entropy.item(), truncnorm.entropy(alpha, beta, loc=loc, scale=scale))
