@@ -22,7 +22,6 @@ class TruncatedStandardNormal(Distribution):
         'a': constraints.real,
         'b': constraints.real,
     }
-    support = constraints.real
     has_rsample = True
 
     def __init__(self, a, b, eps=1e-8, validate_args=None):
@@ -48,6 +47,12 @@ class TruncatedStandardNormal(Distribution):
         self._mean = -(self._little_phi_b - self._little_phi_a) / self._Z
         self._variance = 1 - self._lpbb_m_lpaa_d_Z - ((self._little_phi_b - self._little_phi_a) / self._Z) ** 2
         self._entropy = CONST_LOG_SQRT_2PI_E + self._log_Z - 0.5 * self._lpbb_m_lpaa_d_Z
+
+        self._support = constraints.interval(self.a, self.b)
+
+    @property
+    def support(self):
+        return self._support
 
     @property
     def mean(self):
@@ -114,7 +119,6 @@ class TruncatedNormal(TruncatedStandardNormal):
         'a': constraints.real,
         'b': constraints.real,
     }
-    support = constraints.real
     has_rsample = True
 
     def __init__(self, loc, scale, a, b, eps=1e-8, validate_args=None):
@@ -138,7 +142,10 @@ class TruncatedNormal(TruncatedStandardNormal):
         return value * self.scale + self.loc
 
     def cdf(self, value):
-        return super(TruncatedNormal, self).cdf(self._to_std_rv(value))
+        std_rv_value = self._to_std_rv(value)
+        if self._validate_args:
+            self._validate_sample(std_rv_value)
+        return super(TruncatedNormal, self).cdf(std_rv_value)
 
     def icdf(self, value):
         if self._validate_args:
@@ -146,9 +153,10 @@ class TruncatedNormal(TruncatedStandardNormal):
         return self._from_std_rv(super(TruncatedNormal, self).icdf(value))
 
     def log_prob(self, value):
+        std_rv_value = self._to_std_rv(value)
         if self._validate_args:
-            self._validate_sample(value)
-        return super(TruncatedNormal, self).log_prob(self._to_std_rv(value)) - self._log_scale
+            self._validate_sample(std_rv_value)
+        return super(TruncatedNormal, self).log_prob(std_rv_value) - self._log_scale
 
 
 if __name__ == '__main__':
