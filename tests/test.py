@@ -1,4 +1,5 @@
 import unittest
+from unittest.util import safe_repr
 
 import torch
 from scipy.stats import truncnorm
@@ -36,39 +37,51 @@ class TruncatedNormalSC:
 
 class Tests(unittest.TestCase):
 
-    def _test_numerical(self, loc, scale, a, b, do_icdf=True, places_logprob=4):
+    def assertRelativelyEqual(self, first, second, tol=1e-6, error=1e-5, msg=None):
+        if first == second:
+            return
+        diff = abs(first - second)
+        rel = diff / max(abs(first), abs(second))
+        if rel <= tol or diff <= error:
+            return
+        standardMsg = '%s != %s within tol=%s abs=%s (rel=%s diff=%s)' % (safe_repr(first), safe_repr(second),
+            safe_repr(tol), safe_repr(error), safe_repr(rel), safe_repr(diff))
+        msg = self._formatMessage(msg, standardMsg)
+        raise self.failureException(msg)
+
+    def _test_numerical(self, loc, scale, a, b, do_icdf=True):
         pt = TruncatedNormalPT(loc, scale, a, b, validate_args=None)
         sc = TruncatedNormalSC(loc, scale, a, b)
 
         mean_sc = sc.mean
         mean_pt = pt.mean.numpy()
-        self.assertAlmostEqual(mean_sc, mean_pt, places=4)
+        self.assertRelativelyEqual(mean_sc, mean_pt)
 
         var_sc = sc.variance
         var_pt = pt.variance.numpy()
-        self.assertAlmostEqual(var_sc, var_pt, places=4)
+        self.assertRelativelyEqual(var_sc, var_pt)
 
         entropy_sc = sc.entropy
         entropy_pt = pt.entropy.numpy()
-        self.assertAlmostEqual(entropy_sc, entropy_pt, places=4)
+        self.assertRelativelyEqual(entropy_sc, entropy_pt)
 
-        N = 2
+        N = 10
         for i in range(N):
             p = i / (N - 1)
             x = a + (b - a) * p
 
             cdf_sc = sc.cdf(x)
             cdf_pt = float(pt.cdf(torch.tensor(x)))
-            self.assertAlmostEqual(cdf_sc, cdf_pt, places=4)
+            self.assertRelativelyEqual(cdf_sc, cdf_pt)
 
             log_prob_sc = sc.log_prob(x)
             log_prob_pt = float(pt.log_prob(torch.tensor(x)))
-            self.assertAlmostEqual(log_prob_sc, log_prob_pt, places=places_logprob)
+            self.assertRelativelyEqual(log_prob_sc, log_prob_pt)
 
             if do_icdf:
                 icdf_sc = sc.icdf(p)
                 icdf_pt = float(pt.icdf(torch.tensor(p)))
-                self.assertAlmostEqual(icdf_sc, icdf_pt, places=3)
+                self.assertRelativelyEqual(icdf_sc, icdf_pt, tol=1e-4, error=1e-3)
 
     def test_simple(self):
         self._test_numerical(0., 1., -2., 0.)
@@ -91,8 +104,14 @@ class Tests(unittest.TestCase):
         self._test_numerical(0., 1., 2., 32., do_icdf=False)
         self._test_numerical(0., 1., 2., 64., do_icdf=False)
         self._test_numerical(0., 1., 2., 128., do_icdf=False)
-        self._test_numerical(0., 1., 2., 256., do_icdf=False, places_logprob=2)
-        self._test_numerical(0., 1., 2., 512., do_icdf=False, places_logprob=2)
+        self._test_numerical(0., 1., 2., 256., do_icdf=False)
+        self._test_numerical(0., 1., 2., 512., do_icdf=False)
+
+    def test_support(self):
+        pt = TruncatedNormalPT(0., 1., -1., 2., validate_args=None)
+        with self.assertRaises(ValueError) as e:
+            pt.log_prob(torch.tensor(-10))
+        self.assertEqual(str(e.exception), 'The value argument must be within the support')
 
 
 if __name__ == '__main__':

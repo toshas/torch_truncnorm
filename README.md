@@ -11,7 +11,8 @@ I just needed differentiation with respect to the parameters of the distribution
 bundled in torch.distributions as of 1.6.0.
 
 # Known issues
-`icdf` is rather unstable and most of the times will produce infinity.
+`icdf` is numerically unstable; as a consequence, so is `rsample`. This issue is also seen in 
+`torch.distributions.normal.Normal`, so it is sort of *normal* (ba-dum-tss).
 
 # Links
 https://people.sc.fsu.edu/~jburkardt/presentations/truncated_normal.pdf

@@ -24,7 +24,7 @@ class TruncatedStandardNormal(Distribution):
     }
     has_rsample = True
 
-    def __init__(self, a, b, eps=1e-8, validate_args=None):
+    def __init__(self, a, b, validate_args=None):
         self.a, self.b = broadcast_all(a, b)
         if isinstance(a, Number) and isinstance(b, Number):
             batch_shape = torch.Size()
@@ -35,8 +35,9 @@ class TruncatedStandardNormal(Distribution):
             raise ValueError('Truncation bounds types are different')
         if any((self.a >= self.b).view(-1,).tolist()):
             raise ValueError('Incorrect truncation range')
-        self._dtype_min_gt_0 = torch.tensor(torch.finfo(self.a.dtype).eps, dtype=self.a.dtype)
-        self._dtype_max_lt_1 = torch.tensor(1 - torch.finfo(self.a.dtype).eps, dtype=self.a.dtype)
+        eps = torch.finfo(self.a.dtype).eps
+        self._dtype_min_gt_0 = torch.tensor(eps, dtype=self.a.dtype)
+        self._dtype_max_lt_1 = torch.tensor(1 - eps, dtype=self.a.dtype)
         self._little_phi_a = self._little_phi(self.a)
         self._little_phi_b = self._little_phi(self.b)
         self._big_phi_a = self._big_phi(self.a)
@@ -48,11 +49,9 @@ class TruncatedStandardNormal(Distribution):
         self._variance = 1 - self._lpbb_m_lpaa_d_Z - ((self._little_phi_b - self._little_phi_a) / self._Z) ** 2
         self._entropy = CONST_LOG_SQRT_2PI_E + self._log_Z - 0.5 * self._lpbb_m_lpaa_d_Z
 
-        self._support = constraints.interval(self.a, self.b)
-
-    @property
+    @constraints.dependent_property
     def support(self):
-        return self._support
+        return constraints.interval(self.a, self.b)
 
     @property
     def mean(self):
@@ -88,8 +87,6 @@ class TruncatedStandardNormal(Distribution):
         return ((self._big_phi(value) - self._big_phi_a) / self._Z).clamp(0, 1)
 
     def icdf(self, value):
-        if self._validate_args:
-            self._validate_sample(value)
         return self._inv_big_phi(self._big_phi_a + value * self._Z)
 
     def log_prob(self, value):
@@ -109,47 +106,29 @@ class TruncatedNormal(TruncatedStandardNormal):
     https://people.sc.fsu.edu/~jburkardt/presentations/truncated_normal.pdf
     """
 
-    arg_constraints = {
-        'loc': constraints.real,
-        'scale': constraints.positive,
-        'a': constraints.real,
-        'b': constraints.real,
-    }
     has_rsample = True
 
-    def __init__(self, loc, scale, a, b, eps=1e-8, validate_args=None):
-        self.loc, self.scale, self.a, self.b = broadcast_all(loc, scale, a, b)
-        a_standard = (a - self.loc) / self.scale
-        b_standard = (b - self.loc) / self.scale
-        super(TruncatedNormal, self).__init__(a_standard, b_standard, eps=eps, validate_args=validate_args)
+    def __init__(self, loc, scale, a, b, validate_args=None):
+        self.loc, self.scale, a, b = broadcast_all(loc, scale, a, b)
+        a = (a - self.loc) / self.scale
+        b = (b - self.loc) / self.scale
+        super(TruncatedNormal, self).__init__(a, b, validate_args=validate_args)
         self._log_scale = self.scale.log()
         self._mean = self._mean * self.scale + self.loc
         self._variance = self._variance * self.scale ** 2
         self._entropy += self._log_scale
 
     def _to_std_rv(self, value):
-        if self._validate_args:
-            self._validate_sample(value)
         return (value - self.loc) / self.scale
 
     def _from_std_rv(self, value):
-        if self._validate_args:
-            self._validate_sample(value)
         return value * self.scale + self.loc
 
     def cdf(self, value):
-        std_rv_value = self._to_std_rv(value)
-        if self._validate_args:
-            self._validate_sample(std_rv_value)
-        return super(TruncatedNormal, self).cdf(std_rv_value)
+        return super(TruncatedNormal, self).cdf(self._to_std_rv(value))
 
     def icdf(self, value):
-        if self._validate_args:
-            self._validate_sample(value)
         return self._from_std_rv(super(TruncatedNormal, self).icdf(value))
 
     def log_prob(self, value):
-        std_rv_value = self._to_std_rv(value)
-        if self._validate_args:
-            self._validate_sample(std_rv_value)
-        return super(TruncatedNormal, self).log_prob(std_rv_value) - self._log_scale
+        return super(TruncatedNormal, self).log_prob(self._to_std_rv(value)) - self._log_scale
