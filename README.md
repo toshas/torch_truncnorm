@@ -14,5 +14,10 @@ distribution is not bundled in `torch.distributions` as of 1.6.0.
 `icdf` is numerically unstable; as a consequence, so is `rsample`. This issue is also seen in 
 `torch.distributions.normal.Normal`, so it is sort of *normal* (ba-dum-tss).
 
+# Tests
+```shell script
+CUDA_VISIBLE_DEVICES=0 python -m tests.test
+```
+
 # Links
 https://people.sc.fsu.edu/~jburkardt/presentations/truncated_normal.pdf
