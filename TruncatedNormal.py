@@ -97,10 +97,6 @@ class TruncatedStandardNormal(Distribution):
         p = torch.empty(shape).uniform_(self._dtype_min_gt_0, self._dtype_max_lt_1)
         return self.icdf(p)
 
-    def expand(self, batch_shape, _instance=None):
-        # TODO: it is likely that keeping temporary variables in private attributes violates the logic of this method
-        raise NotImplementedError
-
 
 class TruncatedNormal(TruncatedStandardNormal):
     """
@@ -149,18 +145,3 @@ class TruncatedNormal(TruncatedStandardNormal):
         if self._validate_args:
             self._validate_sample(value)
         return super(TruncatedNormal, self).log_prob(self._to_std_rv(value)) - self._log_scale
-
-
-if __name__ == '__main__':
-    from scipy.stats import truncnorm
-    loc, scale, a, b = 1., 2., 1., 2.
-    tn_pt = TruncatedNormal(loc, scale, a, b)
-    mean_pt, var_pt = tn_pt.mean.item(), tn_pt.variance.item()
-    alpha, beta = (a - loc) / scale, (b - loc) / scale
-    mean_sp, var_sp = truncnorm.stats(alpha, beta, loc=loc, scale=scale, moments='mv')
-    print('mean', mean_pt, mean_sp)
-    print('var', var_pt, var_sp)
-    print('cdf', tn_pt.cdf(1.4).item(), truncnorm.cdf(1.4, alpha, beta, loc=loc, scale=scale))
-    print('icdf', tn_pt.icdf(0.333).item(), truncnorm.ppf(0.333, alpha, beta, loc=loc, scale=scale))
-    print('logpdf', tn_pt.log_prob(1.5).item(), truncnorm.logpdf(1.5, alpha, beta, loc=loc, scale=scale))
-    print('entropy', tn_pt.entropy.item(), truncnorm.entropy(alpha, beta, loc=loc, scale=scale))
