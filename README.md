@@ -7,8 +7,8 @@ Truncated Normal distribution in PyTorch. The module provides:
 - Batching support.
 
 # Why
-I just needed differentiation with respect to the parameters of the distribution and found that this distribution is not 
-bundled in torch.distributions as of 1.6.0.
+I just needed differentiation with respect to parameters of the distribution and found out that truncated normal 
+distribution is not bundled in `torch.distributions` as of 1.6.0.
 
 # Known issues
 `icdf` is numerically unstable; as a consequence, so is `rsample`. This issue is also seen in 

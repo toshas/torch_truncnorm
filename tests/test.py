@@ -1,5 +1,6 @@
 import unittest
 from unittest.util import safe_repr
+from warnings import warn
 
 import torch
 from scipy.stats import truncnorm
@@ -112,6 +113,18 @@ class Tests(unittest.TestCase):
         with self.assertRaises(ValueError) as e:
             pt.log_prob(torch.tensor(-10))
         self.assertEqual(str(e.exception), 'The value argument must be within the support')
+
+    def test_cuda(self):
+        if not torch.cuda.is_available():
+            warn('Skipping CUDA tests')
+            return
+        loc = torch.tensor([0., 1.]).cuda()
+        scale = torch.tensor([1., 2.]).cuda()
+        a = torch.tensor([-1., -10.]).cuda()
+        b = torch.tensor([0., 100.]).cuda()
+        pt = TruncatedNormalPT(loc, scale, a, b, validate_args=None)
+        s = pt.rsample()
+        self.assertTrue(s.is_cuda)
 
 
 if __name__ == '__main__':

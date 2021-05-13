@@ -36,8 +36,8 @@ class TruncatedStandardNormal(Distribution):
         if any((self.a >= self.b).view(-1,).tolist()):
             raise ValueError('Incorrect truncation range')
         eps = torch.finfo(self.a.dtype).eps
-        self._dtype_min_gt_0 = torch.tensor(eps, dtype=self.a.dtype)
-        self._dtype_max_lt_1 = torch.tensor(1 - eps, dtype=self.a.dtype)
+        self._dtype_min_gt_0 = eps
+        self._dtype_max_lt_1 = 1 - eps
         self._little_phi_a = self._little_phi(self.a)
         self._little_phi_b = self._little_phi(self.b)
         self._big_phi_a = self._big_phi(self.a)
@@ -96,7 +96,7 @@ class TruncatedStandardNormal(Distribution):
 
     def rsample(self, sample_shape=torch.Size()):
         shape = self._extended_shape(sample_shape)
-        p = torch.empty(shape).uniform_(self._dtype_min_gt_0, self._dtype_max_lt_1)
+        p = torch.empty(shape, device=self.a.device).uniform_(self._dtype_min_gt_0, self._dtype_max_lt_1)
         return self.icdf(p)
 
 
