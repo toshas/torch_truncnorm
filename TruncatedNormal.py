@@ -73,11 +73,19 @@ class TruncatedStandardNormal(Distribution):
 
     @staticmethod
     def _little_phi(x):
-        return (-(x ** 2) * 0.5).exp() * CONST_INV_SQRT_2PI
+        if x.isinf():
+            return torch.zeros(x.size()).to(x)
+        else:
+            return (-(x ** 2) * 0.5).exp() * CONST_INV_SQRT_2PI
 
     @staticmethod
     def _big_phi(x):
-        return 0.5 * (1 + (x * CONST_INV_SQRT_2).erf())
+        if x.isposinf():
+            return torch.ones(x.size()).to(x)
+        elif x.isneginf():
+            return torch.zeros(x.size()).to(x)
+        else:
+            return 0.5 * (1 + (x * CONST_INV_SQRT_2).erf())
 
     @staticmethod
     def _inv_big_phi(x):
